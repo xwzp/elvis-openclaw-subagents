@@ -1,6 +1,6 @@
 ---
 name: agent-swarm
-description: Orchestrate a swarm of coding agents (Codex, Claude Code, Gemini) using git worktrees, tmux sessions, and automated monitoring. Use when delegating coding tasks to multiple parallel agents, managing feature branches with isolated worktrees, setting up automated PR review pipelines, monitoring agent progress and CI status. Triggers on "spawn agents", "agent swarm", "parallel development", "worktree agents", "coding fleet", "one-person dev team", "multi-agent coding".
+description: Orchestrate a swarm of coding agents (Codex, Claude Code, Gemini) using git worktrees, tmux sessions, and automated monitoring. Use when delegating coding tasks to multiple parallel agents, managing feature branches with isolated worktrees, setting up automated PR review pipelines, monitoring agent progress and CI status. Triggers on "spawn agents", "agent swarm", "parallel development", "worktree agents", "coding fleet", "one-person dev team", "multi-agent coding", "开发项目".
 metadata:
   {
     "openclaw": {
