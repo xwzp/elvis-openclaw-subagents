@@ -26,16 +26,25 @@ Orchestrate multiple coding agents in parallel. Each agent gets an isolated git 
 - At least one of: `codex` CLI, `claude` CLI
 - `jq`
 
-## Directory Structure
+## Runtime Data
+
+All runtime data is stored under `{baseDir}/.runtime/`, organized by project name. Each project gets its own isolated directory:
 
 ```
-$SWARM_DIR/              # Default: ~/.agent-swarm
-├── tasks.json           # Task registry
-├── logs/                # Agent output logs
-├── prompts/             # Saved task prompts
-├── learnings/           # Learning journal (JSONL)
-└── archive/             # Archived completed tasks
+{baseDir}/.runtime/
+├── my-saas-app/               # Project name = repo basename (or --project override)
+│   ├── tasks.json             # Task registry for this project
+│   ├── tasks.json.lock        # File lock for concurrent access
+│   ├── logs/                  # Agent output logs
+│   ├── prompts/               # Saved task prompts
+│   ├── learnings/             # Learning journal (JSONL)
+│   └── archive/               # Archived completed tasks
+└── another-project/
+    ├── tasks.json
+    └── ...
 ```
+
+The project name defaults to the basename of `--repo`. You can override it with `--project <name>` on any script. Directories are created automatically on first use.
 
 ## Quick Reference
 
@@ -46,19 +55,19 @@ bash {baseDir}/scripts/spawn-agent.sh \
   --repo /path/to/repo \
   --task "feat-custom-templates" \
   --branch "feat/custom-templates" \
-  --agent codex \
-  --model "o3" \
+  --agent claude \
+  --model "claude-opus-4-6" \
   --effort high \
   --prompt "Implement custom email templates..." \
   --description "Custom email templates for agency customer"
 ```
 
-Options: `--agent codex|claude`, `--model <model>`, `--effort high|medium|low`, `--prompt-file <path>`, `--pkg-mgr pnpm|npm|yarn|bun`, `--no-notify`, `--description <text>`, `--worktree-base <dir>`
+Options: `--agent codex|claude`, `--model <model>`, `--effort high|medium|low`, `--prompt-file <path>`, `--project <name>`, `--pkg-mgr pnpm|npm|yarn|bun`, `--no-notify`, `--description <text>`, `--worktree-base <dir>`
 
 ### Check All Agents
 
 ```bash
-bash {baseDir}/scripts/check-agents.sh [--json] [--stale-hours N]
+bash {baseDir}/scripts/check-agents.sh [--project <name>] [--json] [--stale-hours N]
 ```
 
 Exit 0 = all good. Exit 1 = needs human attention. Updates tasks.json status automatically. Use `--json` for machine-readable output. Use `--stale-hours N` to flag agents running longer than N hours (default: 4).
@@ -66,7 +75,7 @@ Exit 0 = all good. Exit 1 = needs human attention. Updates tasks.json status aut
 ### Dashboard
 
 ```bash
-bash {baseDir}/scripts/status.sh [--json] [--filter <status>]
+bash {baseDir}/scripts/status.sh [--project <name>] [--json] [--filter <status>]
 ```
 
 Read-only view of all tasks with elapsed time, PR numbers, and CI status. Does not modify any state.
@@ -104,7 +113,7 @@ Generates an AI code review on a PR diff and posts it via `gh pr review`.
 ### Clean Up
 
 ```bash
-bash {baseDir}/scripts/cleanup.sh [--older-than N]
+bash {baseDir}/scripts/cleanup.sh [--project <name>] [--older-than N]
 ```
 
 Removes worktrees and registry entries for done/merged/abandoned tasks. Archives cleaned tasks. Use `--older-than N` to only clean tasks completed more than N hours ago.
@@ -118,7 +127,7 @@ bash {baseDir}/scripts/log-learning.sh \
   --notes "Including type definitions upfront improved Codex success rate"
 ```
 
-Records prompt patterns and outcomes to `$SWARM_DIR/learnings/learnings.jsonl`.
+Records prompt patterns and outcomes to the project's `learnings/learnings.jsonl`.
 
 ## Agent Selection
 

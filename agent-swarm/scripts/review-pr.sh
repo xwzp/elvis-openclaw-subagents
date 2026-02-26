@@ -5,29 +5,33 @@ set -euo pipefail
 # Gets PR diff, generates review with Claude, posts via gh pr review
 #
 # Usage:
-#   review-pr.sh --task <id>
+#   review-pr.sh --task <id> [--project <name>]
 #   review-pr.sh --pr <number> --repo <path>
 #
 # Options:
 #   --task    Task ID (looks up PR number from registry)
 #   --pr      PR number (used with --repo)
 #   --repo    Path to repository (used with --pr)
-#   --model   Model to use for review (default: claude-sonnet-4-5)
+#   --project Project name (auto-detected from task if omitted)
+#   --model   Model to use for review (default: claude-sonnet-4-6)
 #   --help    Show this help message
 
-SWARM_DIR="${SWARM_DIR:-$HOME/.agent-swarm}"
-TASKS_FILE="$SWARM_DIR/tasks.json"
+# Resolve runtime directory from script location
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RUNTIME_DIR="$SKILL_DIR/.runtime"
 
-TASK="" PR_NUMBER="" REPO="" MODEL="claude-sonnet-4-5"
+TASK="" PR_NUMBER="" REPO="" PROJECT="" MODEL="claude-sonnet-4-6"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --task) TASK="$2"; shift 2 ;;
     --pr) PR_NUMBER="$2"; shift 2 ;;
     --repo) REPO="$2"; shift 2 ;;
+    --project) PROJECT="$2"; shift 2 ;;
     --model) MODEL="$2"; shift 2 ;;
     --help|-h)
-      sed -n '3,14p' "$0" | sed 's/^# \?//'
+      sed -n '3,16p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
@@ -36,11 +40,24 @@ done
 
 # Resolve task to PR number and repo
 if [[ -n "$TASK" ]]; then
-  if [[ ! -f "$TASKS_FILE" ]]; then
-    echo "ERROR: No tasks registered" >&2
+  # Resolve project from task ID if not specified
+  if [[ -z "$PROJECT" ]]; then
+    for proj_dir in "$RUNTIME_DIR"/*/; do
+      [[ ! -d "$proj_dir" ]] && continue
+      tf="$proj_dir/tasks.json"
+      if [[ -f "$tf" ]] && jq -e --arg id "$TASK" '.[] | select(.id == $id)' "$tf" &>/dev/null; then
+        PROJECT="$(basename "$proj_dir")"
+        break
+      fi
+    done
+  fi
+
+  if [[ -z "$PROJECT" ]]; then
+    echo "ERROR: Task '$TASK' not found in any project" >&2
     exit 1
   fi
 
+  TASKS_FILE="$RUNTIME_DIR/$PROJECT/tasks.json"
   TASK_DATA=$(jq --arg id "$TASK" '.[] | select(.id == $id)' "$TASKS_FILE")
   if [[ -z "$TASK_DATA" ]]; then
     echo "ERROR: Task '$TASK' not found" >&2

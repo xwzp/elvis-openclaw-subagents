@@ -16,7 +16,7 @@ Choosing the right agent for each task maximizes one-shot success rate and minim
 | **Cost** | ~$90/month | ~$100/month | Free tier available |
 | **Sandbox** | Sandboxed by default | Needs `--dangerously-skip-permissions` | Varies |
 | **False positives** | Low | Medium (overly cautious) | Low |
-| **Default model** | `o3` | `claude-opus-4-5` | `gemini-2.5-pro` |
+| **Default model** | `gpt-5.2-codex` | `claude-opus-4-6` | `gemini-2.5-pro` |
 
 ## Selection Matrix
 
@@ -54,7 +54,7 @@ Choosing the right agent for each task maximizes one-shot success rate and minim
 ### Codex
 
 ```bash
-codex --model o3 \
+codex --model gpt-5.2-codex \
   -c "model_reasoning_effort=high" \
   --dangerously-bypass-approvals-and-sandbox \
   "Your prompt here"
@@ -68,7 +68,7 @@ Effort levels:
 ### Claude Code
 
 ```bash
-claude --model claude-opus-4-5 \
+claude --model claude-opus-4-6 \
   --dangerously-skip-permissions \
   -p "Your prompt here"
 ```

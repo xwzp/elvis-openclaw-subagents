@@ -6,20 +6,22 @@ set -euo pipefail
 # Increments retry counter and logs the respawn reason.
 #
 # Usage:
-#   respawn-agent.sh --task <id> --prompt <new_prompt> --reason <text>
+#   respawn-agent.sh --task <id> --prompt <new_prompt> --reason <text> [--project <name>]
 #
 # Options:
-#   --task       Task ID to respawn (required)
-#   --prompt     New/improved prompt (required unless --prompt-file)
+#   --task        Task ID to respawn (required)
+#   --prompt      New/improved prompt (required unless --prompt-file)
 #   --prompt-file Read new prompt from file
-#   --reason     Reason for respawn (required)
-#   --help       Show this help message
+#   --reason      Reason for respawn (required)
+#   --project     Project name (auto-detected from task if omitted)
+#   --help        Show this help message
 
-SWARM_DIR="${SWARM_DIR:-$HOME/.agent-swarm}"
-TASKS_FILE="$SWARM_DIR/tasks.json"
+# Resolve runtime directory from script location
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RUNTIME_DIR="$SKILL_DIR/.runtime"
 
-TASK="" PROMPT="" REASON=""
+TASK="" PROMPT="" REASON="" PROJECT=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -27,8 +29,9 @@ while [[ $# -gt 0 ]]; do
     --prompt) PROMPT="$2"; shift 2 ;;
     --prompt-file) PROMPT="$(cat "$2")"; shift 2 ;;
     --reason) REASON="$2"; shift 2 ;;
+    --project) PROJECT="$2"; shift 2 ;;
     --help|-h)
-      sed -n '3,15p' "$0" | sed 's/^# \?//'
+      sed -n '3,17p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
@@ -39,15 +42,30 @@ done
 [[ -z "$PROMPT" ]] && echo "ERROR: --prompt or --prompt-file is required" >&2 && exit 1
 [[ -z "$REASON" ]] && echo "ERROR: --reason is required" >&2 && exit 1
 
-# Load original task data
-if [[ ! -f "$TASKS_FILE" ]]; then
-  echo "ERROR: No tasks registered (tasks.json not found)" >&2
+# Resolve project from task ID if not specified
+if [[ -z "$PROJECT" ]]; then
+  for proj_dir in "$RUNTIME_DIR"/*/; do
+    [[ ! -d "$proj_dir" ]] && continue
+    tf="$proj_dir/tasks.json"
+    if [[ -f "$tf" ]] && jq -e --arg id "$TASK" '.[] | select(.id == $id)' "$tf" &>/dev/null; then
+      PROJECT="$(basename "$proj_dir")"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$PROJECT" ]]; then
+  echo "ERROR: Task '$TASK' not found in any project" >&2
   exit 1
 fi
 
+SWARM_DIR="$RUNTIME_DIR/$PROJECT"
+TASKS_FILE="$SWARM_DIR/tasks.json"
+
+# Load original task data
 TASK_DATA=$(jq --arg id "$TASK" '.[] | select(.id == $id)' "$TASKS_FILE")
 if [[ -z "$TASK_DATA" ]]; then
-  echo "ERROR: Task '$TASK' not found in registry" >&2
+  echo "ERROR: Task '$TASK' not found in project '$PROJECT'" >&2
   exit 1
 fi
 
@@ -66,7 +84,7 @@ if [[ "$RETRIES" -ge "$MAX_RETRIES" ]]; then
   exit 1
 fi
 
-echo "Respawning task: $TASK (retry $((RETRIES + 1))/$MAX_RETRIES)"
+echo "Respawning task: $TASK in project '$PROJECT' (retry $((RETRIES + 1))/$MAX_RETRIES)"
 echo "  Reason: $REASON"
 echo "  Agent:  $AGENT ($MODEL)"
 echo "  Branch: $BRANCH"
@@ -94,5 +112,6 @@ bash "$SCRIPT_DIR/spawn-agent.sh" \
   --branch "$BRANCH" \
   --agent "$AGENT" \
   --model "$MODEL" \
+  --project "$PROJECT" \
   --prompt "$PROMPT" \
   --description "RESPAWN ($((RETRIES + 1))/$MAX_RETRIES): $REASON"

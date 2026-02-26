@@ -1,6 +1,6 @@
 # Task Registry Schema
 
-Tasks are tracked in `$SWARM_DIR/tasks.json` (default: `~/.agent-swarm/tasks.json`).
+Tasks are tracked in `{baseDir}/.runtime/<project>/tasks.json`. Each project has its own isolated registry.
 
 ## Schema
 
@@ -11,7 +11,7 @@ Tasks are tracked in `$SWARM_DIR/tasks.json` (default: `~/.agent-swarm/tasks.jso
   "id": "feat-custom-templates",
   "tmuxSession": "agent-feat-custom-templates",
   "agent": "codex",
-  "model": "o3",
+  "model": "gpt-5.2-codex",
   "description": "Implement custom email templates for agency customer",
   "repo": "/absolute/path/to/my-project",
   "worktree": "/path/to/feat-custom-templates",
@@ -50,7 +50,7 @@ After merge, task gets additional fields:
 | `id` | string | Unique task identifier, used in tmux session name |
 | `tmuxSession` | string | tmux session name (`agent-<id>`) |
 | `agent` | string | `codex` or `claude` |
-| `model` | string | Model used (e.g. `o3`, `claude-opus-4-5`) |
+| `model` | string | Model used (e.g. `gpt-5.2-codex`, `claude-opus-4-6`) |
 | `description` | string | Short description of the task |
 | `repo` | string | Absolute path to main repository |
 | `worktree` | string | Absolute path to git worktree |
@@ -81,4 +81,4 @@ After merge, task gets additional fields:
 
 ## File Locking
 
-All scripts use `flock` on `$SWARM_DIR/tasks.json.lock` for safe concurrent access. This prevents corruption when multiple scripts (spawn, check, cleanup) access the registry simultaneously.
+All scripts use `flock` on `<project_dir>/tasks.json.lock` for safe concurrent access. This prevents corruption when multiple scripts (spawn, check, cleanup) access the same project's registry simultaneously.

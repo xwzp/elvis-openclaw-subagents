@@ -4,7 +4,7 @@ set -euo pipefail
 # Agent Swarm: Spawn a coding agent in an isolated git worktree + tmux session
 #
 # Usage:
-#   spawn-agent.sh --repo <path> --task <id> --branch <name> --agent <codex|claude> --prompt <text> [options]
+#   spawn-agent.sh --repo <path> --task <id> --branch <name> --prompt <text> [options]
 #
 # Options:
 #   --repo          Path to the main git repository (required)
@@ -16,21 +16,25 @@ set -euo pipefail
 #   --prompt        Task prompt (required unless --prompt-file)
 #   --prompt-file   Read prompt from file
 #   --description   Short description of the task (defaults to first 200 chars of prompt)
+#   --project       Project name (defaults to basename of --repo)
 #   --pkg-mgr       Package manager: pnpm, npm, yarn, bun (auto-detected)
 #   --no-notify     Don't notify on completion
 #   --worktree-base Base directory for worktrees (default: repo parent dir)
 #   --help          Show this help message
 
-SWARM_DIR="${SWARM_DIR:-$HOME/.agent-swarm}"
+# Resolve runtime directory from script location
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RUNTIME_DIR="$SKILL_DIR/.runtime"
 
 show_help() {
-  sed -n '3,18p' "$0" | sed 's/^# \?//'
+  sed -n '3,22p' "$0" | sed 's/^# \?//'
   exit 0
 }
 
 # Parse arguments
-REPO="" TASK="" BRANCH="" AGENT="codex" MODEL="" EFFORT="high"
-PROMPT="" DESCRIPTION="" NOTIFY=true PKG_MGR="" WORKTREE_BASE=""
+REPO="" TASK="" BRANCH="" AGENT="claude" MODEL="" EFFORT="high"
+PROMPT="" DESCRIPTION="" PROJECT="" NOTIFY=true PKG_MGR="" WORKTREE_BASE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -43,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --prompt) PROMPT="$2"; shift 2 ;;
     --prompt-file) PROMPT="$(cat "$2")"; shift 2 ;;
     --description) DESCRIPTION="$2"; shift 2 ;;
+    --project) PROJECT="$2"; shift 2 ;;
     --no-notify) NOTIFY=false; shift ;;
     --pkg-mgr) PKG_MGR="$2"; shift 2 ;;
     --worktree-base) WORKTREE_BASE="$2"; shift 2 ;;
@@ -64,6 +69,10 @@ WORKTREE_BASE="${WORKTREE_BASE:-$(dirname "$REPO")}"
 WORKTREE_PATH="$WORKTREE_BASE/${TASK}"
 TMUX_SESSION="agent-${TASK}"
 
+# Resolve project name (default to repo basename)
+PROJECT="${PROJECT:-$REPO_NAME}"
+SWARM_DIR="$RUNTIME_DIR/$PROJECT"
+
 # Default description to first 200 chars of prompt
 if [[ -z "$DESCRIPTION" ]]; then
   DESCRIPTION="$(echo "$PROMPT" | head -c 200)"
@@ -82,13 +91,13 @@ fi
 # Set default model
 if [[ -z "$MODEL" ]]; then
   case $AGENT in
-    codex) MODEL="o3" ;;
-    claude) MODEL="claude-opus-4-5" ;;
-    *) MODEL="o3" ;;
+    codex) MODEL="gpt-5.2-codex" ;;
+    claude) MODEL="claude-opus-4-6" ;;
+    *) MODEL="gpt-5.2-codex" ;;
   esac
 fi
 
-# Create swarm directories
+# Create project directories
 mkdir -p "$SWARM_DIR"/{logs,prompts,learnings,archive}
 
 # Save full prompt
@@ -190,6 +199,7 @@ LOCK_FILE="$SWARM_DIR/tasks.json.lock"
 
 echo ""
 echo "Agent spawned successfully"
+echo "   Project:      $PROJECT"
 echo "   Task ID:      $TASK"
 echo "   Description:  $DESCRIPTION"
 echo "   Agent:        $AGENT ($MODEL)"

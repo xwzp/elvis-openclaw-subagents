@@ -4,24 +4,28 @@ set -euo pipefail
 # Agent Swarm: Send mid-task instructions to a running agent via tmux
 #
 # Usage:
-#   redirect-agent.sh --task <id> --message <text>
+#   redirect-agent.sh --task <id> --message <text> [--project <name>]
 #
 # Options:
 #   --task     Task ID to redirect (required)
 #   --message  Instructions to send (required)
+#   --project  Project name (auto-detected from task if omitted)
 #   --help     Show this help message
 
-SWARM_DIR="${SWARM_DIR:-$HOME/.agent-swarm}"
-TASKS_FILE="$SWARM_DIR/tasks.json"
+# Resolve runtime directory from script location
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RUNTIME_DIR="$SKILL_DIR/.runtime"
 
-TASK="" MESSAGE=""
+TASK="" MESSAGE="" PROJECT=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --task) TASK="$2"; shift 2 ;;
     --message) MESSAGE="$2"; shift 2 ;;
+    --project) PROJECT="$2"; shift 2 ;;
     --help|-h)
-      sed -n '3,11p' "$0" | sed 's/^# \?//'
+      sed -n '3,13p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
@@ -31,15 +35,30 @@ done
 [[ -z "$TASK" ]] && echo "ERROR: --task is required" >&2 && exit 1
 [[ -z "$MESSAGE" ]] && echo "ERROR: --message is required" >&2 && exit 1
 
-# Verify task exists
-if [[ ! -f "$TASKS_FILE" ]]; then
-  echo "ERROR: No tasks registered (tasks.json not found)" >&2
+# Resolve project from task ID if not specified
+if [[ -z "$PROJECT" ]]; then
+  for proj_dir in "$RUNTIME_DIR"/*/; do
+    [[ ! -d "$proj_dir" ]] && continue
+    tf="$proj_dir/tasks.json"
+    if [[ -f "$tf" ]] && jq -e --arg id "$TASK" '.[] | select(.id == $id)' "$tf" &>/dev/null; then
+      PROJECT="$(basename "$proj_dir")"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$PROJECT" ]]; then
+  echo "ERROR: Task '$TASK' not found in any project" >&2
   exit 1
 fi
 
+SWARM_DIR="$RUNTIME_DIR/$PROJECT"
+TASKS_FILE="$SWARM_DIR/tasks.json"
+
+# Verify task exists
 TASK_EXISTS=$(jq --arg id "$TASK" '[.[] | select(.id == $id)] | length' "$TASKS_FILE")
 if [[ "$TASK_EXISTS" == "0" ]]; then
-  echo "ERROR: Task '$TASK' not found in registry" >&2
+  echo "ERROR: Task '$TASK' not found in project '$PROJECT'" >&2
   exit 1
 fi
 
@@ -59,5 +78,5 @@ mkdir -p "$SWARM_DIR/logs"
 REDIRECT_LOG="$SWARM_DIR/logs/${TASK}-redirects.log"
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $MESSAGE" >> "$REDIRECT_LOG"
 
-echo "Message sent to agent '$TASK' (session: $TMUX_SESSION)"
+echo "Message sent to agent '$TASK' in project '$PROJECT' (session: $TMUX_SESSION)"
 echo "Logged to: $REDIRECT_LOG"
