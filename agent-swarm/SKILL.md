@@ -64,21 +64,13 @@ bash {baseDir}/scripts/spawn-agent.sh \
 
 Options: `--agent codex|claude`, `--model <model>`, `--effort high|medium|low`, `--prompt-file <path>`, `--project <name>`, `--pkg-mgr pnpm|npm|yarn|bun`, `--no-notify`, `--description <text>`, `--worktree-base <dir>`
 
-### Check All Agents
+### Check Status
 
 ```bash
-bash {baseDir}/scripts/check-agents.sh [--project <name>] [--json] [--stale-hours N]
+bash {baseDir}/scripts/status.sh [--project <name>] [--json] [--filter <status>] [--stale-hours N]
 ```
 
-Exit 0 = all good. Exit 1 = needs human attention. Updates tasks.json status automatically. Use `--json` for machine-readable output. Use `--stale-hours N` to flag agents running longer than N hours (default: 4).
-
-### Dashboard
-
-```bash
-bash {baseDir}/scripts/status.sh [--project <name>] [--json] [--filter <status>]
-```
-
-Read-only view of all tasks with elapsed time, PR numbers, and CI status. Does not modify any state.
+Refreshes all external state (tmux sessions, PRs, CI, reviews), writes changes back to tasks.json, then displays the dashboard. Exit 0 = all good. Exit 1 = needs human attention. Use `--stale-hours N` to flag agents running longer than N hours (default: 4).
 
 ### Redirect an Agent
 
@@ -104,11 +96,16 @@ Smart respawn: reuses repo, branch, agent, and model config from the original ta
 ### Review a PR
 
 ```bash
-bash {baseDir}/scripts/review-pr.sh --task "feat-custom-templates"
-bash {baseDir}/scripts/review-pr.sh --pr 341 --repo /path/to/repo
+# Dispatch individual reviewers — OpenClaw decides who and how many
+bash {baseDir}/scripts/review-pr.sh --task "feat-custom-templates" --reviewer codex
+bash {baseDir}/scripts/review-pr.sh --task "feat-custom-templates" --reviewer claude --focus security
+bash {baseDir}/scripts/review-pr.sh --task "feat-custom-templates" --reviewer gemini --focus performance
+
+# Or by PR number directly
+bash {baseDir}/scripts/review-pr.sh --pr 341 --repo /path/to/repo --reviewer codex
 ```
 
-Generates an AI code review on a PR diff and posts it via `gh pr review`.
+Options: `--reviewer codex|claude|gemini` (required), `--model <model>`, `--focus general|security|performance|logic`, `--prompt <custom>`, `--prompt-file <path>`, `--no-post` (print to stdout only).
 
 ### Clean Up
 
@@ -131,19 +128,21 @@ Records prompt patterns and outcomes to the project's `learnings/learnings.jsonl
 
 ## Agent Selection
 
-| Task Type | Agent | Why |
-|-----------|-------|-----|
-| Backend logic, complex bugs, multi-file refactors | Codex | Thorough reasoning across codebase |
-| Frontend work, git operations, quick fixes | Claude Code | Faster, fewer permission issues |
-| UI design specs | Gemini then Claude Code | Gemini designs, Claude builds |
+| Role | Agent | Why |
+|------|-------|-----|
+| **All coding tasks** (backend, frontend, bugs, refactors) | Claude Code (`claude-opus-4-6`) | Default for all development work |
+| **Code review** | Claude Code (`claude-sonnet-4-6`) | Fast, accurate, understands its own code patterns |
+| **Code review** | Codex (`gpt-5.2-codex`) | Most thorough, save for important PRs |
+| **Code review** | Gemini (`gemini-2.5-pro`) | Security, scalability, free tier |
+| **UI design specs** | Gemini then Claude Code | Gemini designs, Claude builds |
 
-Default: Codex for most tasks. Use Claude Code for speed-sensitive or frontend work. See `references/agent-selection.md` for detailed selection criteria.
+Default: Claude Code for all coding and most reviews. Codex for important PR reviews. Gemini as free second opinion. See `references/agent-selection.md` for details.
 
 ## Task Lifecycle
 
 1. **Scope** -- Gather context (customer data, meeting notes, existing config). Write precise prompt with all relevant file paths, schemas, requirements.
 2. **Spawn** -- `spawn-agent.sh` creates worktree + tmux session + registers task.
-3. **Monitor** -- `check-agents.sh` every 10 min (cron or heartbeat). No LLM calls -- pure shell checks.
+3. **Monitor** -- `status.sh` to check all agent states. No LLM calls -- pure shell checks.
 4. **PR Created** -- Agent commits, pushes, opens PR via `gh pr create --fill`.
 5. **Review** -- Multiple AI reviewers post comments on PR. Use `review-pr.sh` to trigger.
 6. **CI** -- Lint, types, unit tests, E2E must all pass.

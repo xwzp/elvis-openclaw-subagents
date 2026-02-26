@@ -9,7 +9,7 @@ The traditional "Ralph Loop" is: pull context, generate, evaluate, save learning
 ## The Loop
 
 ```
-1. DETECT  — check-agents.sh identifies failure
+1. DETECT  — status.sh identifies failure
 2. ANALYZE — Orchestrator examines logs, diff, CI output
 3. IMPROVE — Craft better prompt based on failure analysis
 4. RESPAWN — respawn-agent.sh with new prompt
@@ -18,7 +18,7 @@ The traditional "Ralph Loop" is: pull context, generate, evaluate, save learning
 
 ## Step 1: Detect
 
-`check-agents.sh` runs periodically and detects failures:
+`status.sh` runs periodically and detects failures:
 
 - **Agent died (no PR)** — tmux session gone, no PR created
 - **CI failing** — PR exists but CI checks are red
@@ -163,11 +163,11 @@ bash log-learning.sh \
 
 ```
 1. Spawn: feat-billing-fix with Codex
-2. check-agents.sh: Agent died (no PR). Retry 0/3.
+2. status.sh: Agent died (no PR). Retry 0/3.
 3. Read log: Agent got confused by multiple billing modules.
 4. Respawn: "Focus ONLY on src/services/billing-v2.ts. The old billing module in src/services/billing.ts is deprecated."
    Reason: "Agent confused by legacy billing module"
-5. check-agents.sh: PR created, CI passing, reviews approved.
+5. status.sh: PR created, CI passing, reviews approved.
 6. Log: success — "Always specify which billing module (v2) in prompts to avoid confusion with deprecated module."
 ```
 

@@ -75,17 +75,17 @@ bash {baseDir}/scripts/spawn-agent.sh --repo $REPO --task "ui-polish" --branch "
 
 ## Step 3: Monitoring
 
-Run `check-agents.sh` every 10 minutes via cron or heartbeat.
+Run `status.sh` to check all agent states. Can be triggered manually or via cron.
 
 ```bash
-# Cron setup (every 10 minutes)
-*/10 * * * * bash {baseDir}/scripts/check-agents.sh
-
-# Or use the dashboard for a quick look
+# Manual check
 bash {baseDir}/scripts/status.sh
+
+# Or set up a cron (every 10 minutes)
+*/10 * * * * bash {baseDir}/scripts/status.sh
 ```
 
-The check script is 100% deterministic -- no LLM calls. It checks:
+The script is 100% deterministic -- no LLM calls. It checks:
 - Is the tmux session still alive?
 - Has a PR been opened on the tracked branch?
 - What's the CI status? (via `gh pr checks`)
@@ -93,7 +93,7 @@ The check script is 100% deterministic -- no LLM calls. It checks:
 
 Use `--stale-hours N` to flag agents running too long:
 ```bash
-bash {baseDir}/scripts/check-agents.sh --stale-hours 2
+bash {baseDir}/scripts/status.sh --stale-hours 2
 ```
 
 ### Failure Recovery
